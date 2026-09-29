@@ -52,6 +52,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg); overscroll-behavior: none;
@@ -580,7 +581,13 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
     b.players = b.players.filter(x => x.id !== selId);
     selId = null; refresh();
   });
-  $('#pclose').addEventListener('click', () => { selId = null; renderCourt(); renderEdit(); });
+  function closeEdit() {
+    selId = null;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    renderCourt(); renderEdit();
+  }
+  $('#pclose').addEventListener('click', closeEdit);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && selId && !lite) closeEdit(); });
 
   /* ---------- 全画面表示 / 戻る ---------- */
   const root = document.documentElement;
