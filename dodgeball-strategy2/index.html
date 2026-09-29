@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#11161b">
+<title>ドッヂボール作戦ボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: スマホ縦向き1画面。上=全画面/戻る/盤面タブ、中=コート(図を縦に回転)、下=操作。 */
+:root {
+  --bg: #eef1f3;
+  --fg: #17212b;
+  --muted: #5b6875;
+  --panel: #ffffff;
+  --line-ui: #d3dae0;
+  --c-in: #178bb0;
+  --c-out: #e50012;
+  --c-pass: #ffe600;
+  --line: #ffffff;
+  --ink: #2b2100;
+  --ta: #ffffff;
+  --ta-line: #17212b;
+  --num-a: #17212b;
+  --tb: #1b2330;
+  --tb-line: #ffffff;
+  --num-b: #ffffff;
+  --warn: #d9391f;
+  --on-warn: #ffffff;
+  --ball: #f2c230;
+  --pen1: #ffffff; --pen1h: #10203a;
+  --pen2: #ffe14d; --pen2h: #3b2a00;
+  --pen3: #111827; --pen3h: #ffffff;
+  --font-body: "Zen Kaku Gothic New", system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-num: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --fg: #e8edf1; --muted: #93a0ac; --panel: #1a2128; --line-ui: #2b353e;
+    --warn: #ff6b4d; --on-warn: #14100d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --fg: #e8edf1; --muted: #93a0ac; --panel: #1a2128; --line-ui: #2b353e;
+  --warn: #ff6b4d; --on-warn: #14100d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); overscroll-behavior: none;
+  font-family: var(--font-body); font-size: 14px; line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input { font-family: inherit; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+#app {
+  position: relative; height: 100%; width: 100%; max-width: 560px; margin-inline: auto;
+  padding-inline: 16px; padding-block: 8px; display: flex; flex-direction: column; gap: 8px;
+}
+html.is-fs #app { padding-block: 4px; }
+html.fs-lite #app { position: fixed; inset: 0; z-index: 30; background: var(--bg); height: auto; }
+
+.top { display: flex; gap: 6px; flex: none; }
+.sq {
+  flex: none; width: 54px; height: 46px; border: 1px solid var(--line-ui); background: var(--panel); color: var(--fg);
+  border-radius: 12px; display: grid; place-items: center; align-content: center; gap: 0; padding: 3px 0;
+  font-size: 10px; font-weight: 700; line-height: 1.1; cursor: pointer;
+}
+.sq svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.sq[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.sq:disabled { opacity: .4; cursor: default; }
+.tabs {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+  background: var(--panel); border: 1px solid var(--line-ui); border-radius: 12px; padding: 3px;
+}
+.tab { border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 14px; border-radius: 9px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+
+#courtwrap { position: relative; flex: 1 1 0; min-height: 0; border-radius: 10px; overflow: hidden; }
+#court { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+#court .in { fill: var(--c-in); }
+#court .out { fill: var(--c-out); }
+#court .pass { fill: var(--c-pass); }
+#court .lbl text { font-size: 22px; font-weight: 700; letter-spacing: .08em; fill: #fff; opacity: .92; text-anchor: middle; pointer-events: none; }
+#court .lbl2 text { font-size: 22px; font-weight: 700; letter-spacing: .12em; fill: var(--ink); text-anchor: middle; pointer-events: none; }
+.tool-move .pl, .tool-move .ball { cursor: grab; }
+.pl .hit { fill: transparent; }
+.pl .shadow { fill: #000; opacity: .2; }
+.pl .body { fill: var(--ta); stroke: var(--ta-line); stroke-width: 3; }
+.pl.b .body { fill: var(--tb); stroke: var(--tb-line); }
+.pl .num { font-family: var(--font-num); font-weight: 700; font-size: 24px; fill: var(--num-a); text-anchor: middle; pointer-events: none; }
+.pl.b .num { fill: var(--num-b); }
+.pl .nm { font-size: 17px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: #0b1a2e; stroke-width: 4px; stroke-linejoin: round; text-anchor: middle; pointer-events: none; }
+.pl .ring0 { fill: none; stroke: #0b1a2e; stroke-width: 8; opacity: .55; pointer-events: none; }
+.pl .ring { fill: none; stroke: #fff; stroke-width: 4; stroke-dasharray: 8 6; pointer-events: none; }
+.ball .b0 { fill: var(--ball); stroke: #10203a; stroke-width: 3; }
+.ball .b1 { fill: none; stroke: #10203a; stroke-width: 2.5; }
+
+#toast {
+  position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 5;
+  background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+#rotate {
+  display: none; position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 8; margin: 0;
+  background: var(--fg); color: var(--bg); padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+@media (orientation: landscape) and (max-height: 520px) { #rotate { display: block; } }
+
+.edit {
+  flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line-ui); border-radius: 12px; padding: 8px 10px;
+}
+.edit label { font-size: 12px; color: var(--muted); font-weight: 700; }
+.edit input {
+  height: 40px; border: 1px solid var(--line-ui); border-radius: 8px; background: var(--bg); color: var(--fg);
+  padding: 0 10px; font-size: 16px; min-width: 0;
+}
+#pn { width: 64px; font-family: var(--font-num); font-weight: 700; font-size: 20px; }
+#pname { flex: 1 1 80px; }
+.dot { width: 16px; height: 16px; border-radius: 50%; background: var(--ta); border: 2px solid var(--ta-line); flex: none; }
+.dot.b { background: var(--tb); border-color: var(--tb-line); }
+
+#ctl { flex: none; display: grid; gap: 6px; min-width: 0; }
+.row1 { display: flex; gap: 8px; align-items: center; }
+.tools {
+  flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+  background: var(--panel); border: 1px solid var(--line-ui); border-radius: 12px; padding: 3px;
+}
+.tool {
+  border: 0; background: transparent; color: var(--muted); border-radius: 9px; cursor: pointer;
+  min-height: 48px; display: grid; place-items: center; align-content: center; gap: 1px; padding: 3px 0; font-size: 11px; font-weight: 700;
+}
+.tool svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tool[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.swatches { flex: none; display: flex; gap: 6px; }
+.sw {
+  width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--panel); background: var(--c);
+  box-shadow: 0 0 0 1px var(--line-ui); cursor: pointer; padding: 0;
+}
+.sw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--fg); }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; touch-action: pan-x; align-items: center; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; border: 1px solid var(--line-ui); background: var(--panel); color: var(--fg);
+  font-size: 13px; font-weight: 500; padding: 0 12px; min-height: 40px; border-radius: 20px; cursor: pointer; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip.armed { background: var(--warn); color: var(--on-warn); border-color: var(--warn); }
+.chip.danger { color: var(--warn); }
+.chip.armed.danger { color: var(--on-warn); }
+.chip:disabled { opacity: .4; cursor: default; }
+.sep { flex: none; width: 1px; height: 24px; background: var(--line-ui); margin-inline: 2px; }
+.glabel { flex: none; font-size: 12px; color: var(--muted); font-weight: 700; padding-inline: 2px; }
+#saveInfo { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
+#saveInfo.bad { color: var(--warn); font-weight: 700; }
+@media (min-height: 760px) { .tool { min-height: 52px; } }
+@media (max-height: 640px) { .tool { min-height: 42px; } .chip { min-height: 36px; } .sq { height: 42px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+</style>
+
+</head>
+<body>
+<div id="app">
+  <p id="rotate">縦向きで使うと大きく表示されます</p>
+
+  <header class="top">
+    <button class="sq" id="bFs" type="button" aria-pressed="false" aria-label="全画面表示">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全画面</button>
+    <button class="sq" id="bBack" type="button" aria-label="全画面表示を終了して戻る" disabled>
+      <svg viewBox="0 0 24 24"><path d="M9 6L3 12l6 6M3 12h11a6 6 0 0 1 6 6"/></svg>戻る</button>
+    <div class="tabs" role="tablist" aria-label="盤面">
+      <button class="tab" role="tab" data-i="0">試合前</button>
+      <button class="tab" role="tab" data-i="1">中盤</button>
+      <button class="tab" role="tab" data-i="2">試合後</button>
+    </div>
+  </header>
+
+  <div id="courtwrap">
+    <svg id="court" viewBox="60 60 680 1080" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ドッヂボールコート（内野10m×10mが2面、外野は3m幅）">
+      <rect class="pass" x="0" y="0" width="800" height="1200"/>
+      <rect class="out" x="80" y="80" width="640" height="320"/>
+      <rect class="out" x="80" y="800" width="640" height="320"/>
+      <rect class="in" x="200" y="200" width="400" height="800"/>
+      <g fill="none" stroke="var(--line)" stroke-width="6" pointer-events="none">
+        <rect x="200" y="200" width="400" height="800"/>
+        <line x1="200" y1="600" x2="600" y2="600"/>
+        <circle cx="400" cy="600" r="40"/>
+      </g>
+      <g class="lbl">
+        <text x="400" y="114">自チーム 外野</text>
+        <text x="400" y="1104">相手 外野</text>
+        <text x="400" y="238">相手 内野</text>
+        <text x="400" y="974">自チーム 内野</text>
+      </g>
+      <g class="lbl2">
+        <text transform="translate(146 600) rotate(-90)">移動通路</text>
+        <text transform="translate(654 600) rotate(90)">移動通路</text>
+      </g>
+      <g id="gPlayers"></g>
+      <g id="gStrokes" pointer-events="none"></g>
+      <g id="gLive" pointer-events="none"></g>
+    </svg>
+    <div id="toast" role="status" hidden></div>
+  </div>
+
+  <section id="edit" class="edit" hidden aria-label="選手の編集">
+    <span class="dot" id="editDot"></span>
+    <label for="pn">背番号</label>
+    <input id="pn" type="number" inputmode="numeric" min="1" max="99">
+    <label for="pname">名前</label>
+    <input id="pname" type="text" maxlength="4" placeholder="4文字まで" autocomplete="off">
+    <button class="chip danger" id="pdel" type="button">削除</button>
+    <button class="chip" id="pclose" type="button">閉じる</button>
+  </section>
+
+  <div id="ctl">
+    <div class="row1">
+      <div class="tools" role="group" aria-label="ツール">
+        <button class="tool" data-tool="move" type="button" aria-pressed="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>移動</button>
+        <button class="tool" data-tool="pen" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/></svg>ペン</button>
+        <button class="tool" data-tool="arrow" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M5 19L19 5M19 5h-7M19 5v7"/></svg>矢印</button>
+        <button class="tool" data-tool="erase" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M4 15l8-9 8 7-5 6H9zM9 19h11"/></svg>消す</button>
+      </div>
+      <div class="swatches" role="group" aria-label="ペンの色">
+        <button class="sw" data-pen="1" type="button" style="--c:var(--pen1)" aria-label="白" aria-pressed="true"></button>
+        <button class="sw" data-pen="2" type="button" style="--c:var(--pen2)" aria-label="黄" aria-pressed="false"></button>
+        <button class="sw" data-pen="3" type="button" style="--c:var(--pen3)" aria-label="黒" aria-pressed="false"></button>
+      </div>
+    </div>
+
+    <div class="chips" role="group" aria-label="盤面の操作">
+      <span class="glabel">陣形</span>
+      <button class="chip" data-form="line" type="button">1列</button>
+      <button class="chip" data-form="two" type="button">2列</button>
+      <span class="sep"></span>
+      <button class="chip" id="bBall" type="button" aria-pressed="false">ボール</button>
+      <button class="chip" id="bShowB" type="button" aria-pressed="false">相手を表示</button>
+      <button class="chip" id="bAddA" type="button">＋味方</button>
+      <button class="chip" id="bAddB" type="button">＋相手</button>
+      <span class="sep"></span>
+      <button class="chip" id="bUndo" type="button">1つ戻す</button>
+      <button class="chip" id="bCopy" type="button">前の盤面をコピー</button>
+      <button class="chip danger" id="bReset" type="button">初期化</button>
+    </div>
+    <div id="saveInfo">自動保存</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const svg = $('#court'), gPlayers = $('#gPlayers'), gStrokes = $('#gStrokes'), gLive = $('#gLive');
+  // 座標は 800×1200（1m=40）。自チームは下の内野、相手は上の内野。
+  const VW = 800, VH = 1200, CX = 400, CY = 600, MAXP = 12;
+  const BX0 = 76, BX1 = 724, BY0 = 76, BY1 = 1124; // 動かせる範囲（コートの外周）
+  const KEY = 'dodgeball-board-v6';
+  const r1 = n => Math.round(n * 10) / 10;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let uidn = 0;
+  const uid = () => 'p' + Date.now().toString(36) + (uidn++).toString(36);
+
+  /* ---------- 陣形 ---------- */
+  // [センターラインからの距離, 人数, 横の間隔]。列は「相手内野に近い列」から順。
+  // 1番は外野（相手コートの後ろ）に置き、2番から最前列→後列の順に、左から右へ並べる。
+  const FORMS = {
+    line: [[120, 11, 36.5]],
+    two:  [[120, 6, 62], [240, 5, 62]]
+  };
+  const OUTER = { a: 140, b: 1060 }; // 自チームの外野は上（相手コートの後ろ）、相手の外野は下
+  function slots(form, team) {
+    const out = [];
+    for (const [dy, c, gap] of FORMS[form]) for (let i = 0; i < c; i++) {
+      out.push({ x: r1(CX + (i - (c - 1) / 2) * gap), y: team === 'a' ? CY + dy : CY - dy });
+    }
+    return out;
+  }
+  function applyFormation(b, form, team) {
+    const list = b.players.filter(p => p.team === team).sort((x, y) => x.n - y.n);
+    const s = slots(form, team);
+    let k = 0;
+    list.forEach(p => {
+      if (p.n === 1) { p.x = CX; p.y = OUTER[team]; }
+      else if (s[k]) { p.x = s[k].x; p.y = s[k].y; k++; }
+    });
+  }
+  function addTeam(b, team) {
+    for (let i = 1; i <= MAXP; i++) b.players.push({ id: uid(), team, n: i, name: '', x: CX, y: team === 'a' ? 800 : 400 });
+  }
+  function newBoard() {
+    // 初期状態は2列。相手も表示し、自チームと上下対称に並べる。
+    const b = { players: [], ball: null, strokes: [], showB: true };
+    addTeam(b, 'a'); addTeam(b, 'b');
+    applyFormation(b, 'two', 'a'); applyFormation(b, 'two', 'b');
+    return b;
+  }
+  // 相手を後から出すときは、いまの自チームの位置を上下反転して置く
+  function mirrorTeam(b) {
+    addTeam(b, 'b'); applyFormation(b, 'two', 'b');
+    for (const q of b.players.filter(p => p.team === 'b')) {
+      const a = b.players.find(p => p.team === 'a' && p.n === q.n);
+      if (a) { q.x = a.x; q.y = r1(VH - a.y); }
+    }
+  }
+
+  /* ---------- 状態と自動保存 ---------- */
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (s && Array.isArray(s.boards) && s.boards.length === 3 && s.boards.every(b => b && Array.isArray(b.players) && Array.isArray(b.strokes))) {
+        s.cur = clamp(+s.cur || 0, 0, 2);
+        s.boards.forEach(b => ['a', 'b'].forEach(t => { let c = 0; b.players = b.players.filter(p => p.team !== t || ++c <= MAXP); }));
+        return s;
+      }
+    } catch (e) {}
+    return null;
+  }
+  let saveOK = true;
+  function showSave() {
+    const el = $('#saveInfo');
+    if (!saveOK) { el.textContent = '保存できません（閉じると消えます）'; el.classList.add('bad'); return; }
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    el.classList.remove('bad');
+    el.textContent = '自動保存 ' + z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); saveOK = true; } catch (e) { saveOK = false; }
+    showSave();
+  }
+  let S = load() || { cur: 0, boards: [0, 1, 2].map(newBoard) };
+  let tool = 'move', pen = 1, selId = null;
+  const board = () => S.boards[S.cur];
+
+  /* ---------- 描画 ---------- */
+  function playerSVG(p) {
+    const sel = p.id === selId;
+    return `<g class="pl ${p.team}" data-id="${p.id}" transform="translate(${p.x} ${p.y})">` +
+      (sel ? '<circle class="ring0" r="25"/><circle class="ring" r="25"/>' : '') +
+      '<circle class="hit" r="20"/><circle class="shadow" r="17" cy="2"/><circle class="body" r="17"/>' +
+      `<text class="num" y="0" dy=".36em">${esc(p.n)}</text>` +
+      (p.name ? `<text class="nm" y="40">${esc(p.name)}</text>` : '') + '</g>';
+  }
+  function ballSVG(bl) {
+    return `<g class="ball" data-id="ball" transform="translate(${bl.x} ${bl.y})"><circle r="22" fill="transparent"/><circle class="b0" r="16"/>` +
+      '<path class="b1" d="M-16 0Q0 -7 16 0M0 -16Q7 0 0 16"/></g>';
+  }
+  function pathD(pts) {
+    const q = pts.length === 1 ? [pts[0], [pts[0][0] + .01, pts[0][1]]] : pts;
+    return 'M' + q.map(p => p[0] + ' ' + p[1]).join('L');
+  }
+  function arrowSVG(a, b, c, h) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L, hl = Math.min(34, L * .6), hw = 16;
+    const bx = b[0] - ux * hl, by = b[1] - uy * hl;
+    const line = (col, sw) => `<line x1="${a[0]}" y1="${a[1]}" x2="${r1(bx)}" y2="${r1(by)}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    const head = (col, sw) => `<polygon points="${b[0]},${b[1]} ${r1(bx - uy * hw)},${r1(by + ux * hw)} ${r1(bx + uy * hw)},${r1(by - ux * hw)}" fill="${col}" stroke="${col}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    return line(h, 14) + head(h, 8) + line(c, 8) + head(c, 0);
+  }
+  function strokeSVG(s) {
+    const c = `var(--pen${s.c})`, h = `var(--pen${s.c}h)`;
+    if (s.t === 'a') return arrowSVG(s.pts[0], s.pts[1], c, h);
+    const d = pathD(s.pts);
+    return `<path d="${d}" fill="none" stroke="${h}" stroke-width="14" stroke-opacity=".5" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="${d}" fill="none" stroke="${c}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  function renderStrokes() { gStrokes.innerHTML = board().strokes.map(strokeSVG).join(''); }
+  function renderCourt() {
+    const b = board();
+    let h = '';
+    for (const p of b.players) { if (p.team === 'b' && !b.showB) continue; h += playerSVG(p); }
+    if (b.ball) h += ballSVG(b.ball);
+    gPlayers.innerHTML = h;
+    renderStrokes();
+  }
+
+  /* ---------- UI ---------- */
+  let toastT;
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2200);
+  }
+  function clearArm(btn) {
+    clearTimeout(btn._t);
+    if (btn.classList.contains('armed')) { btn.classList.remove('armed'); btn.textContent = btn.dataset.l; }
+  }
+  function armed(btn, label, fn) {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('armed')) { clearArm(btn); fn(); return; }
+      btn.dataset.l = btn.textContent; btn.classList.add('armed'); btn.textContent = label;
+      btn._t = setTimeout(() => clearArm(btn), 3000);
+    });
+  }
+  function updateUI() {
+    const b = board();
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(+t.dataset.i === S.cur)));
+    document.querySelectorAll('.tool').forEach(t => t.setAttribute('aria-pressed', String(t.dataset.tool === tool)));
+    document.querySelectorAll('.sw').forEach(t => t.setAttribute('aria-pressed', String(+t.dataset.pen === pen)));
+    svg.setAttribute('class', 'tool-' + tool);
+    $('#bBall').setAttribute('aria-pressed', String(!!b.ball));
+    const sb = $('#bShowB');
+    sb.setAttribute('aria-pressed', String(b.showB));
+    sb.textContent = b.showB ? '相手を隠す' : '相手を表示';
+    const na = b.players.filter(p => p.team === 'a').length, nb = b.players.filter(p => p.team === 'b').length;
+    $('#bAddA').textContent = `＋味方 ${na}/${MAXP}`; $('#bAddA').disabled = na >= MAXP;
+    $('#bAddB').textContent = `＋相手 ${nb}/${MAXP}`; $('#bAddB').disabled = nb >= MAXP;
+    $('#bCopy').disabled = S.cur === 0;
+    document.querySelectorAll('.chip.armed').forEach(clearArm);
+  }
+  function renderEdit() {
+    const p = board().players.find(x => x.id === selId);
+    $('#edit').hidden = !p;
+    if (!p) return;
+    $('#pn').value = p.n; $('#pname').value = p.name;
+    $('#editDot').className = 'dot ' + p.team;
+  }
+  function refresh() { renderCourt(); renderEdit(); updateUI(); save(); }
+
+  /* ---------- ポインタ操作 ---------- */
+  function pos(e) {
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return { x: q.x, y: q.y };
+  }
+  function distSeg(p, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    let t = l2 ? ((p.x - a[0]) * dx + (p.y - a[1]) * dy) / l2 : 0;
+    t = clamp(t, 0, 1);
+    return Math.hypot(p.x - (a[0] + t * dx), p.y - (a[1] + t * dy));
+  }
+  function hit(s, p) {
+    if (s.pts.length === 1) return Math.hypot(p.x - s.pts[0][0], p.y - s.pts[0][1]) < 30;
+    for (let i = 1; i < s.pts.length; i++) if (distSeg(p, s.pts[i - 1], s.pts[i]) < 30) return true;
+    return false;
+  }
+  function erase(p) {
+    const b = board(), n = b.strokes.length;
+    b.strokes = b.strokes.filter(s => !hit(s, p));
+    if (b.strokes.length !== n) renderStrokes();
+  }
+  function renderLive(l) { gLive.innerHTML = strokeSVG(l); }
+
+  let drag = null;
+  svg.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    const p = pos(e), b = board();
+    if (tool === 'move') {
+      const g = e.target.closest('[data-id]');
+      if (!g) { if (selId) { selId = null; renderCourt(); renderEdit(); } return; }
+      const id = g.dataset.id;
+      const obj = id === 'ball' ? b.ball : b.players.find(x => x.id === id);
+      if (!obj) return;
+      drag = { type: 'move', id, obj, g, ox: p.x - obj.x, oy: p.y - obj.y, sx: p.x, sy: p.y, moved: false };
+      gPlayers.appendChild(g);
+    } else if (tool === 'erase') {
+      drag = { type: 'erase' }; erase(p);
+    } else {
+      const start = [r1(p.x), r1(p.y)];
+      const live = { t: tool === 'arrow' ? 'a' : 'p', c: pen, pts: tool === 'arrow' ? [start, start] : [start] };
+      drag = { type: 'draw', live }; renderLive(live);
+    }
+    svg.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const p = pos(e);
+    if (drag.type === 'move') {
+      if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) > 12) drag.moved = true;
+      if (!drag.moved) return;
+      const o = drag.obj;
+      o.x = r1(clamp(p.x - drag.ox, BX0, BX1));
+      o.y = r1(clamp(p.y - drag.oy, BY0, BY1));
+      drag.g.setAttribute('transform', `translate(${o.x} ${o.y})`);
+    } else if (drag.type === 'erase') {
+      erase(p);
+    } else {
+      const l = drag.live, pt = [r1(p.x), r1(p.y)];
+      if (l.t === 'a') l.pts[1] = pt;
+      else { const last = l.pts[l.pts.length - 1]; if (Math.hypot(pt[0] - last[0], pt[1] - last[1]) > 4) l.pts.push(pt); }
+      renderLive(l);
+    }
+    e.preventDefault();
+  });
+  function endDrag() {
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (d.type === 'move') {
+      if (!d.moved && d.id !== 'ball') selId = d.id;
+      renderCourt(); renderEdit();
+    } else if (d.type === 'draw') {
+      const l = d.live;
+      const ok = l.t !== 'a' || Math.hypot(l.pts[1][0] - l.pts[0][0], l.pts[1][1] - l.pts[0][1]) >= 30;
+      if (ok) board().strokes.push(l);
+      gLive.innerHTML = ''; renderStrokes();
+    }
+    save();
+  }
+  svg.addEventListener('pointerup', endDrag);
+  svg.addEventListener('pointercancel', endDrag);
+
+  // うっかり閉じても消えないよう、画面を離れる直前に描きかけも確定して保存する
+  function flush() { if (drag) endDrag(); else save(); }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  window.addEventListener('pagehide', flush);
+
+  /* ---------- ボタン ---------- */
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    if (drag) endDrag();
+    S.cur = +t.dataset.i; selId = null; refresh();
+  }));
+  document.querySelectorAll('.tool').forEach(t => t.addEventListener('click', () => { tool = t.dataset.tool; updateUI(); }));
+  document.querySelectorAll('.sw').forEach(t => t.addEventListener('click', () => {
+    pen = +t.dataset.pen;
+    if (tool !== 'pen' && tool !== 'arrow') tool = 'pen';
+    updateUI();
+  }));
+  $('#bUndo').addEventListener('click', () => { board().strokes.pop(); renderStrokes(); save(); });
+  document.querySelectorAll('[data-form]').forEach(btn => btn.addEventListener('click', () => {
+    const b = board(), f = btn.dataset.form;
+    applyFormation(b, f, 'a');
+    applyFormation(b, f, 'b');
+    refresh();
+  }));
+  $('#bBall').addEventListener('click', () => { const b = board(); b.ball = b.ball ? null : { x: CX, y: CY }; refresh(); });
+  $('#bShowB').addEventListener('click', () => {
+    const b = board();
+    b.showB = !b.showB;
+    if (b.showB && !b.players.some(p => p.team === 'b')) mirrorTeam(b);
+    if (!b.showB && b.players.find(p => p.id === selId && p.team === 'b')) selId = null;
+    refresh();
+  });
+  function addOne(team) {
+    const b = board(), list = b.players.filter(p => p.team === team);
+    if (list.length >= MAXP) { toast('1チーム12人までです'); return; }
+    const used = new Set(list.map(p => p.n));
+    let n = 1; while (used.has(n)) n++;
+    const p = { id: uid(), team, n, name: '', x: r1(140 + Math.random() * 520), y: OUTER[team] };
+    b.players.push(p);
+    if (team === 'b') b.showB = true;
+    selId = p.id; refresh();
+  }
+  $('#bAddA').addEventListener('click', () => addOne('a'));
+  $('#bAddB').addEventListener('click', () => addOne('b'));
+  armed($('#bCopy'), '現在の盤面を上書き', () => {
+    if (S.cur === 0) return;
+    S.boards[S.cur] = JSON.parse(JSON.stringify(S.boards[S.cur - 1]));
+    selId = null; refresh();
+  });
+  armed($('#bReset'), 'もう一度タップで初期化', () => { S.boards[S.cur] = newBoard(); selId = null; refresh(); });
+
+  /* ---------- 選手の編集 ---------- */
+  $('#pn').addEventListener('input', e => {
+    const p = board().players.find(x => x.id === selId); if (!p) return;
+    const v = parseInt(e.target.value, 10);
+    if (!isNaN(v)) { p.n = clamp(v, 1, 99); renderCourt(); save(); }
+  });
+  $('#pname').addEventListener('input', e => {
+    const p = board().players.find(x => x.id === selId); if (!p) return;
+    p.name = e.target.value.slice(0, 4); renderCourt(); save();
+  });
+  $('#pdel').addEventListener('click', () => {
+    const b = board();
+    b.players = b.players.filter(x => x.id !== selId);
+    selId = null; refresh();
+  });
+  $('#pclose').addEventListener('click', () => { selId = null; renderCourt(); renderEdit(); });
+
+  /* ---------- 全画面表示 / 戻る ---------- */
+  const root = document.documentElement;
+  let lite = false; // 全画面APIが使えない環境では、枠いっぱいに広げる表示で代用する
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+  function syncFs() {
+    const on = !!fsEl() || lite;
+    root.classList.toggle('is-fs', !!fsEl());
+    root.classList.toggle('fs-lite', lite);
+    $('#bFs').setAttribute('aria-pressed', String(on));
+    $('#bBack').disabled = !on;
+  }
+  async function enterFs() {
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (req && document.fullscreenEnabled !== false) {
+      try { await Promise.resolve(req.call(root)); syncFs(); return; } catch (e) {}
+    }
+    lite = true; syncFs();
+  }
+  async function exitFs() {
+    if (lite) { lite = false; }
+    if (fsEl()) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen;
+      try { await Promise.resolve(ex.call(document)); } catch (e) {}
+    }
+    syncFs();
+  }
+  $('#bFs').addEventListener('click', () => { if (fsEl() || lite) exitFs(); else enterFs(); });
+  $('#bBack').addEventListener('click', exitFs);
+  document.addEventListener('fullscreenchange', syncFs);
+  document.addEventListener('webkitfullscreenchange', syncFs);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && lite) exitFs(); });
+
+  syncFs();
+  refresh();
+})();
+</script>
+</body>
+</html>
