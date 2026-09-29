@@ -70,12 +70,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 html.is-fs #app { padding: 0; }
 html.fs-lite #app { position: fixed; inset: 0; z-index: 30; background: var(--bg); padding: 0; height: auto; }
 #left { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: .5em; }
-.bar { display: flex; gap: .5em; flex: none; }
+.bar { display: flex; gap: .5em; flex: none; align-items: stretch; }
+.bar .tabs { flex: 1; max-width: 26em; margin-left: .5em; }
+.bar .tab { min-height: 2.4em; }
+#stage.nopanel { grid-template-columns: minmax(0, 1fr); }
+#stage.nopanel #side { display: none; }
 .bar .chip { display: inline-flex; align-items: center; gap: .4em; }
 .bar svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-#courtwrap { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; display: grid; align-content: center; }
-#court { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
+#courtwrap { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; }
+#court { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 #court .in { fill: var(--c-in); }
 #court .out { fill: var(--c-out); }
 #court .pass { fill: var(--c-pass); }
@@ -176,6 +180,13 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
           <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全画面</button>
         <button class="chip" id="bBack" type="button" aria-label="全画面表示を終了して戻る" disabled>
           <svg viewBox="0 0 24 24"><path d="M9 6L3 12l6 6M3 12h11a6 6 0 0 1 6 6"/></svg>戻る</button>
+        <button class="chip" id="bPanel" type="button" aria-pressed="false" aria-label="編集パネルを隠す">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg><span id="bPanelT">パネル隠す</span></button>
+        <div class="tabs" role="tablist" aria-label="盤面">
+          <button class="tab" role="tab" data-i="0">試合前</button>
+          <button class="tab" role="tab" data-i="1">中盤</button>
+          <button class="tab" role="tab" data-i="2">試合後</button>
+        </div>
       </div>
       <div id="courtwrap">
         <svg id="court" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ドッヂボールコート（内野10m×10mが2面、外野は3m幅）">
@@ -209,11 +220,6 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
       <div class="top">
         <h1>ドッヂボール作戦ボード</h1>
         <span id="saveInfo">自動保存</span>
-      </div>
-      <div class="tabs" role="tablist" aria-label="盤面">
-        <button class="tab" role="tab" data-i="0">試合前</button>
-        <button class="tab" role="tab" data-i="1">中盤</button>
-        <button class="tab" role="tab" data-i="2">試合後</button>
       </div>
       <p id="hint"></p>
 
@@ -339,6 +345,7 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
       const s = JSON.parse(raw);
       if (s && Array.isArray(s.boards) && s.boards.length === 3 && s.boards.every(b => b && Array.isArray(b.players) && Array.isArray(b.strokes))) {
         s.cur = clamp(+s.cur || 0, 0, 2);
+        s.hidePanel = !!s.hidePanel;
         s.boards.forEach(b => ['a', 'b'].forEach(t => { let c = 0; b.players = b.players.filter(p => p.team !== t || ++c <= MAXP); }));
         return s;
       }
@@ -441,11 +448,17 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
     $('#bAddA').textContent = `＋味方 ${na}/${MAXP}`; $('#bAddA').disabled = na >= MAXP;
     $('#bAddB').textContent = `＋相手 ${nb}/${MAXP}`; $('#bAddB').disabled = nb >= MAXP;
     $('#bCopy').disabled = S.cur === 0;
+    const hp = !!S.hidePanel;
+    $('#stage').classList.toggle('nopanel', hp);
+    const bp = $('#bPanel');
+    bp.setAttribute('aria-pressed', String(hp));
+    bp.setAttribute('aria-label', hp ? '編集パネルを表示' : '編集パネルを隠す');
+    $('#bPanelT').textContent = hp ? 'パネル表示' : 'パネル隠す';
     document.querySelectorAll('.chip.armed').forEach(clearArm);
   }
   function renderEdit() {
     const p = board().players.find(x => x.id === selId);
-    $('#edit').hidden = !p;
+    $('#edit').hidden = !p || !!S.hidePanel;
     if (!p) return;
     $('#pn').value = p.n; $('#pname').value = p.name;
     $('#editDot').className = 'dot ' + p.team;
@@ -607,6 +620,8 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
   }
   $('#pclose').addEventListener('click', closeEdit);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && selId && !lite) closeEdit(); });
+
+  $('#bPanel').addEventListener('click', () => { S.hidePanel = !S.hidePanel; updateUI(); renderEdit(); save(); });
 
   /* ---------- 全画面表示 / 戻る ---------- */
   const root = document.documentElement;
