@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111c27">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ドッヂタイマー">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>ドッヂボールタイマー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: 体育館の掲示板。上に大きな残り時間と操作、中段に試合時間の設定、下段に左右のチームの集計。 */
+:root {
+  --bg: #e9edf1;
+  --panel: #ffffff;
+  --panel-2: #f1f4f7;
+  --fg: #111c27;
+  --muted: #566573;
+  --line: #ccd4dc;
+  --team-a: #1c5fd0;
+  --team-b: #a35f00;
+  --urgent: #c8202b;
+  --btn: #111c27;
+  --btn-fg: #ffffff;
+  --focus: #1c5fd0;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c131b;
+    --panel: #141e29;
+    --panel-2: #1b2836;
+    --fg: #eaf0f6;
+    --muted: #93a3b3;
+    --line: #2a3949;
+    --team-a: #6ea2ff;
+    --team-b: #f0b34a;
+    --urgent: #ff6470;
+    --btn: #eaf0f6;
+    --btn-fg: #0c131b;
+    --focus: #8ab4ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c131b;
+  --panel: #141e29;
+  --panel-2: #1b2836;
+  --fg: #eaf0f6;
+  --muted: #93a3b3;
+  --line: #2a3949;
+  --team-a: #6ea2ff;
+  --team-b: #f0b34a;
+  --urgent: #ff6470;
+  --btn: #eaf0f6;
+  --btn-fg: #0c131b;
+  --focus: #8ab4ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.app {
+  max-width: 960px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: 14px 28px;
+  display: grid;
+  gap: 14px;
+}
+
+/* header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand h1 { margin: 0; font-size: 1.05rem; font-weight: 900; letter-spacing: 0.02em; }
+.ball-blue { fill: #54beec; }
+.ball-yellow { fill: #f4e42c; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  min-height: 40px; padding: 6px 14px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line);
+  font-size: 0.85rem; font-weight: 700;
+}
+.chip[aria-pressed="true"] { border-color: var(--fg); }
+
+/* clock */
+.clock {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px 16px 18px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+.clock.over { background: color-mix(in srgb, var(--urgent) 14%, var(--panel)); }
+@keyframes flash { 0%, 100% { background: color-mix(in srgb, var(--urgent) 26%, var(--panel)); } 50% { background: var(--panel); } }
+@media (prefers-reduced-motion: no-preference) {
+  .clock.over { animation: flash 0.9s ease-in-out 5; }
+}
+
+.seg {
+  display: inline-grid; grid-auto-flow: column; gap: 2px; padding: 3px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px;
+}
+.seg label { position: relative; display: block; }
+.seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.seg span {
+  display: block; padding: 7px 16px; border-radius: 8px;
+  font-size: 0.9rem; font-weight: 700; color: var(--muted); text-align: center; white-space: nowrap;
+}
+.seg input:checked + span { background: var(--btn); color: var(--btn-fg); }
+.seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 1px; }
+
+.digits {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(5rem, min(30vw, 38vh), 14rem);
+  line-height: 0.95;
+  white-space: nowrap;
+  color: var(--fg);
+  padding-block: 0.02em;
+}
+.digits .d { display: inline-block; width: 0.52em; text-align: center; }
+.digits .c { display: inline-block; width: 0.26em; text-align: center; transform: translateY(-0.05em); }
+.digits .m { display: inline-block; width: 0.32em; text-align: center; }
+.clock.urgent .digits, .clock.over .digits { color: var(--urgent); }
+
+.bar { width: 100%; height: 10px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--fg); transform-origin: left center; transform: scaleX(1); }
+.clock.urgent .bar i, .clock.over .bar i { background: var(--urgent); }
+
+.status { margin: 0; min-height: 1.5em; text-align: center; color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+.clock.over .status { color: var(--fg); font-weight: 700; }
+
+.controls { width: 100%; display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.big {
+  min-height: 64px; border-radius: 12px; font-size: 1.3rem; font-weight: 900; letter-spacing: 0.04em;
+  border: 1px solid var(--line); background: var(--panel-2);
+}
+.big.primary { background: var(--btn); color: var(--btn-fg); border-color: var(--btn); }
+.big.primary.running { background: var(--panel); color: var(--fg); border: 2px solid var(--fg); }
+.big[data-armed] { background: var(--urgent); border-color: var(--urgent); color: #fff; font-size: 1rem; }
+
+/* setup */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; display: grid; gap: 10px; }
+.label { margin: 0; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; color: var(--muted); }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.key {
+  min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2);
+  font-weight: 700; font-size: 1.05rem;
+}
+.key.num { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.02em; }
+.key[aria-pressed="true"] { background: var(--btn); color: var(--btn-fg); border-color: var(--btn); }
+
+/* scores */
+.scores-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.team { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 6px; justify-items: stretch; }
+.team input[type="text"] {
+  width: 100%; min-width: 0; text-align: center; font-size: 1rem; font-weight: 900;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 6px;
+}
+.team-a input[type="text"] { color: var(--team-a); }
+.team-b input[type="text"] { color: var(--team-b); }
+.kind { text-align: center; font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+.num-big {
+  text-align: center; font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(4.5rem, 20vw, 8rem); line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.team-a .num-big { color: var(--team-a); }
+.team-b .num-big { color: var(--team-b); }
+.pm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pm button {
+  min-height: 80px; border-radius: 12px; border: 2px solid var(--fg); background: var(--panel);
+  font-family: var(--font-display); font-size: 3rem; font-weight: 700; line-height: 1;
+}
+.pm button.plus { background: var(--btn); color: var(--btn-fg); border-color: var(--btn); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.linkish {
+  min-height: 40px; padding: 6px 14px; border-radius: 10px;
+  background: transparent; border: 1px solid var(--line); font-size: 0.85rem; font-weight: 700; color: var(--muted);
+}
+.linkish[data-armed] { background: var(--urgent); border-color: var(--urgent); color: #fff; }
+.hint { margin: 0; font-size: 0.8rem; color: var(--muted); }
+
+@media (min-width: 720px) {
+  .app { gap: 16px; padding-block: 20px 40px; }
+  .clock { padding: 24px 28px 26px; gap: 16px; }
+  .controls { max-width: 560px; }
+  .panel { padding: 18px 22px 22px; }
+  .teams { gap: 16px; }
+  .team { padding: 16px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .digits { font-size: clamp(4rem, 34vh, 10rem); }
+  .big { min-height: 52px; }
+}
+</style>
+
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <defs><clipPath id="ballClip"><circle cx="12" cy="12" r="11"></circle></clipPath></defs>
+        <g clip-path="url(#ballClip)">
+          <circle class="ball-blue" cx="12" cy="12" r="11"></circle>
+          <ellipse class="ball-yellow" cx="1.5" cy="12" rx="6.6" ry="13.2"></ellipse>
+          <ellipse class="ball-yellow" cx="22.5" cy="12" rx="6.6" ry="13.2"></ellipse>
+          <ellipse class="ball-yellow" cx="12" cy="23.5" rx="3.6" ry="6"></ellipse>
+        </g>
+      </svg>
+      <h1>ドッヂボールタイマー</h1>
+    </div>
+    <div class="tools">
+      <button class="chip" id="soundBtn" type="button" aria-pressed="true">音 ON</button>
+      <button class="chip" id="testBtn" type="button">ブザー確認</button>
+      <button class="chip" id="fsBtn" type="button">全画面</button>
+    </div>
+  </header>
+
+  <section class="clock" id="clock" aria-label="試合時計">
+    <div class="digits" id="digits" role="timer" aria-label="残り 5分00秒"></div>
+    <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
+    <p class="status" id="status"></p>
+    <div class="controls">
+      <button class="big primary" id="startBtn" type="button">スタート</button>
+      <button class="big" id="resetBtn" type="button">リセット</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="試合時間の設定">
+    <p class="label">試合時間</p>
+    <div class="grid4" id="presets">
+      <button class="key" type="button" data-min="2" aria-pressed="false">2分</button>
+      <button class="key" type="button" data-min="3" aria-pressed="false">3分</button>
+      <button class="key" type="button" data-min="5" aria-pressed="true">5分</button>
+      <button class="key" type="button" data-min="10" aria-pressed="false">10分</button>
+    </div>
+    <p class="label">時間を微調整（試合中も使えます）</p>
+    <div class="grid4" id="adjust">
+      <button class="key num" type="button" data-d="-60000" aria-label="1分減らす">−1:00</button>
+      <button class="key num" type="button" data-d="-10000" aria-label="10秒減らす">−0:10</button>
+      <button class="key num" type="button" data-d="10000" aria-label="10秒増やす">+0:10</button>
+      <button class="key num" type="button" data-d="60000" aria-label="1分増やす">+1:00</button>
+    </div>
+    <p class="hint">スペースキーでスタート/一時停止。残り3秒と0:00でブザーが鳴り、0:00を過ぎるとマイナス表示でカウントアップします。</p>
+  </section>
+
+  <section class="panel" aria-label="チームの集計">
+    <div class="scores-head">
+      <p class="label">集計</p>
+      <div class="seg" role="radiogroup" aria-label="集計の種類">
+        <label><input type="radio" name="mode" value="point" checked><span>点数</span></label>
+        <label><input type="radio" name="mode" value="inner"><span>内野人数</span></label>
+      </div>
+    </div>
+    <div class="teams">
+      <div class="team team-a">
+        <input type="text" id="nameA" value="チームA" maxlength="12" aria-label="左チームの名前" enterkeyhint="done">
+        <div class="kind" data-kind>点数</div>
+        <div class="num-big" id="scoreA" aria-live="polite">0</div>
+        <div class="pm">
+          <button type="button" data-team="a" data-delta="-1" aria-label="左チームを1減らす">−</button>
+          <button type="button" class="plus" data-team="a" data-delta="1" aria-label="左チームを1増やす">+1</button>
+        </div>
+      </div>
+      <div class="team team-b">
+        <input type="text" id="nameB" value="チームB" maxlength="12" aria-label="右チームの名前" enterkeyhint="done">
+        <div class="kind" data-kind>点数</div>
+        <div class="num-big" id="scoreB" aria-live="polite">0</div>
+        <div class="pm">
+          <button type="button" data-team="b" data-delta="-1" aria-label="右チームを1減らす">−</button>
+          <button type="button" class="plus" data-team="b" data-delta="1" aria-label="右チームを1増やす">+1</button>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="linkish" id="scoreReset" type="button">集計を0に戻す</button>
+      <button class="linkish" id="innerSet" type="button">内野人数を11人にセット</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var MAX = 5999000, MIN_SET = 10000, MIN_LEFT = 1000, KEY = 'dodge-timer';
+
+  var clock = $('clock'), digits = $('digits'), barFill = $('barFill'), statusEl = $('status');
+  var startBtn = $('startBtn'), resetBtn = $('resetBtn');
+  var soundBtn = $('soundBtn'), testBtn = $('testBtn'), fsBtn = $('fsBtn');
+  var nameA = $('nameA'), nameB = $('nameB'), scoreAEl = $('scoreA'), scoreBEl = $('scoreB');
+  var presetBtns = Array.prototype.slice.call(document.querySelectorAll('#presets .key'));
+  var adjustBtns = Array.prototype.slice.call(document.querySelectorAll('#adjust .key'));
+
+  /* remaining は残り時間（ミリ秒）。0を過ぎるとマイナスになり、そのままカウントアップする */
+  var duration = 300000, remaining = 300000, running = false, over = false;
+  var endAt = 0, timerId = 0, shownText = '', lastBeep = -1;
+  var a = 0, b = 0, mode = 'point', soundOn = true;
+  var audioCtx = null, wakeLock = null;
+
+  function fmt(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function spoken(sec) { return Math.floor(sec / 60) + '分' + ('0' + (sec % 60)).slice(-2) + '秒'; }
+  function teamName(el, fallback) { return el.value.trim() || fallback; }
+
+  /* 表示する文字列。0:00は1秒間表示し、その次の秒から -0:01, -0:02 と増える */
+  function displayText() {
+    if (remaining > 0) return fmt(Math.ceil(remaining / 1000));
+    var extra = Math.floor(-remaining / 1000);
+    return extra === 0 ? '0:00' : '-' + fmt(extra);
+  }
+
+  /* ---- 保存 ---- */
+  function savePrefs() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ names: [nameA.value, nameB.value], sound: soundOn, duration: duration }));
+    } catch (e) { /* 保存できなくても動作に影響なし */ }
+  }
+  function loadPrefs() {
+    try {
+      var p = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!p) return;
+      if (p.names) { nameA.value = p.names[0] || 'チームA'; nameB.value = p.names[1] || 'チームB'; }
+      if (typeof p.sound === 'boolean') soundOn = p.sound;
+      if (typeof p.duration === 'number' && p.duration >= MIN_SET && p.duration <= MAX) { duration = p.duration; remaining = p.duration; }
+    } catch (e) { /* 読めなければ初期値のまま */ }
+  }
+
+  /* ---- 音 ---- */
+  function ensureAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* 音が出せない環境では何もしない */ }
+  }
+  function tone(freq, when, dur, type, vol) {
+    if (!audioCtx || !soundOn) return;
+    var t = audioCtx.currentTime + when;
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  /* 音量を保ったまま鳴らし続け、最後だけ短く切る（電子ブザーの「ビーーー」） */
+  function sustain(freq, dur, type, vol) {
+    if (!audioCtx || !soundOn) return;
+    var t = audioCtx.currentTime;
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.setValueAtTime(vol, t + dur - 0.06);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function buzzer() { sustain(960, 2.2, 'square', 0.26); sustain(1920, 2.2, 'square', 0.05); }
+  function beep() { tone(900, 0, 0.14, 'sine', 0.3); }
+
+  /* ---- 画面を消さない ---- */
+  function lockScreen() {
+    try {
+      if (navigator.wakeLock && !wakeLock) {
+        navigator.wakeLock.request('screen').then(function (l) {
+          wakeLock = l;
+          l.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function unlockScreen() {
+    try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && running) lockScreen();
+  });
+
+  /* ---- 表示 ---- */
+  function midGame() { return running || over || remaining !== duration; }
+
+  function render() {
+    var text = displayText();
+    if (text !== shownText) {
+      shownText = text;
+      var html = '';
+      for (var i = 0; i < text.length; i++) {
+        var ch = text[i];
+        html += ch === ':' ? '<span class="c">:</span>'
+              : ch === '-' ? '<span class="m">-</span>'
+              : '<span class="d">' + ch + '</span>';
+      }
+      digits.innerHTML = html;
+      digits.setAttribute('aria-label', remaining > 0
+        ? '残り ' + spoken(Math.ceil(remaining / 1000))
+        : (remaining <= -1000 ? '超過 ' + spoken(Math.floor(-remaining / 1000)) : '残り0秒'));
+    }
+    var ratio = over ? 1 : (duration > 0 ? Math.min(1, remaining / duration) : 0);
+    barFill.style.transform = 'scaleX(' + ratio + ')';
+    var sec = Math.ceil(remaining / 1000);
+    clock.classList.toggle('urgent', !over && sec > 0 && sec <= 10 && (running || remaining !== duration));
+  }
+
+  function statusText() {
+    if (over) {
+      var n1 = teamName(nameA, 'チームA'), n2 = teamName(nameB, 'チームB');
+      var res = a > b ? n1 + ' 勝ち' : (b > a ? n2 + ' 勝ち' : '引き分け');
+      var unit = mode === 'inner' ? '人' : '点';
+      return '時間終了　' + n1 + ' ' + a + unit + ' − ' + b + unit + ' ' + n2 + '　' + res;
+    }
+    if (running) return '試合中';
+    if (midGame()) return '一時停止中';
+    return '待機中　試合時間 ' + fmt(Math.round(duration / 1000));
+  }
+
+  function ui() {
+    startBtn.textContent = running ? '一時停止' : (midGame() ? '再開' : 'スタート');
+    startBtn.classList.toggle('running', running);
+    clock.classList.toggle('over', over);
+    presetBtns.forEach(function (btn) {
+      btn.disabled = running;
+      btn.setAttribute('aria-pressed', String(duration === Number(btn.dataset.min) * 60000));
+    });
+    adjustBtns.forEach(function (btn) { btn.disabled = over && Number(btn.dataset.d) < 0; });
+    statusEl.textContent = statusText();
+    soundBtn.textContent = soundOn ? '音 ON' : '音 OFF';
+    soundBtn.setAttribute('aria-pressed', String(soundOn));
+  }
+
+  /* ---- タイマー ---- */
+  function tick() {
+    remaining = endAt - performance.now();
+    if (!over && remaining <= 0) {
+      over = true;
+      buzzer();
+      ui();
+    } else if (!over) {
+      var sec = Math.ceil(remaining / 1000);
+      if (sec >= 1 && sec <= 3 && sec !== lastBeep) { lastBeep = sec; beep(); }
+    }
+    render();
+  }
+  function begin() {
+    ensureAudio();
+    running = true;
+    endAt = performance.now() + remaining;
+    lastBeep = -1;
+    clearInterval(timerId);
+    timerId = setInterval(tick, 50);
+    lockScreen(); ui(); render();
+  }
+  function pause() {
+    remaining = endAt - performance.now();
+    running = false;
+    clearInterval(timerId);
+    unlockScreen(); ui(); render();
+  }
+  function toggle() { if (running) pause(); else begin(); }
+  function resetTimer() {
+    running = false; over = false;
+    clearInterval(timerId);
+    remaining = duration; lastBeep = -1;
+    unlockScreen(); ui(); render();
+  }
+  function setDuration(ms) {
+    duration = ms; remaining = ms; over = false; lastBeep = -1;
+    savePrefs(); ui(); render();
+  }
+  function adjust(d) {
+    if (over && d < 0) return;
+    var untouched = !running && !over && remaining === duration;
+    if (running) remaining = endAt - performance.now();
+    var next = remaining + d;
+    if (untouched) next = Math.min(MAX, Math.max(MIN_SET, next));
+    else if (!over) next = Math.min(MAX, Math.max(MIN_LEFT, next));
+    else next = Math.min(MAX, next);
+    remaining = next;
+    if (untouched) { duration = next; savePrefs(); }
+    if (running) endAt = performance.now() + remaining;
+    /* 超過中に時間を足して0より大きくなったら、カウントダウンに戻る */
+    if (over && remaining > 0) { over = false; lastBeep = -1; }
+    ui(); render();
+  }
+
+  /* ---- 集計 ---- */
+  function renderScores() {
+    scoreAEl.textContent = a; scoreBEl.textContent = b;
+    var kind = mode === 'inner' ? '内野人数' : '点数';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-kind]'), function (el) { el.textContent = kind; });
+    statusEl.textContent = statusText();
+  }
+  function bump(team, delta) {
+    if (team === 'a') a = Math.min(99, Math.max(0, a + delta));
+    else b = Math.min(99, Math.max(0, b + delta));
+    renderScores();
+  }
+
+  /* 押し間違いを防ぐため、途中のリセットは2回押しで実行 */
+  function twoStep(btn, armedText, needs, act) {
+    var orig = btn.textContent, t = 0;
+    btn.addEventListener('click', function () {
+      if (!needs()) { act(); return; }
+      if (btn.hasAttribute('data-armed')) {
+        clearTimeout(t); btn.removeAttribute('data-armed'); btn.textContent = orig; act(); return;
+      }
+      btn.setAttribute('data-armed', '1');
+      btn.textContent = armedText;
+      t = setTimeout(function () { btn.removeAttribute('data-armed'); btn.textContent = orig; }, 3000);
+    });
+  }
+
+  /* ---- 操作の登録 ---- */
+  startBtn.addEventListener('click', toggle);
+  twoStep(resetBtn, 'もう一度押す', function () { return running || (!over && remaining !== duration); }, resetTimer);
+  twoStep($('scoreReset'), 'もう一度押して0に戻す', function () { return a !== 0 || b !== 0; }, function () { a = 0; b = 0; renderScores(); });
+  /* 内野人数を両チーム11人にセット。点数モードだった場合は内野人数モードに切り替える */
+  twoStep($('innerSet'), 'もう一度押して11人にセット',
+    function () { return (a !== 0 || b !== 0) && !(a === 11 && b === 11); },
+    function () {
+      a = 11; b = 11; mode = 'inner';
+      var r = document.querySelector('input[name="mode"][value="inner"]');
+      if (r) r.checked = true;
+      renderScores();
+    });
+
+  presetBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () { if (!running) setDuration(Number(btn.dataset.min) * 60000); });
+  });
+  adjustBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () { adjust(Number(btn.dataset.d)); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.pm button'), function (btn) {
+    btn.addEventListener('click', function () { bump(btn.dataset.team, Number(btn.dataset.delta)); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="mode"]'), function (r) {
+    r.addEventListener('change', function () { if (r.checked) { mode = r.value; renderScores(); } });
+  });
+  [nameA, nameB].forEach(function (el) {
+    el.addEventListener('input', function () { savePrefs(); statusEl.textContent = statusText(); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') el.blur(); });
+  });
+
+  soundBtn.addEventListener('click', function () { soundOn = !soundOn; if (soundOn) ensureAudio(); savePrefs(); ui(); });
+  testBtn.addEventListener('click', function () { ensureAudio(); var was = soundOn; soundOn = true; buzzer(); soundOn = was; });
+
+  if (!document.fullscreenEnabled) { fsBtn.hidden = true; }
+  fsBtn.addEventListener('click', function () {
+    try {
+      var p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+      if (p && p.catch) p.catch(function () { fsBtn.hidden = true; });
+    } catch (e) { fsBtn.hidden = true; }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target !== document.body) return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  });
+
+  /* ---- 起動（更新時は試合状態を引き継ぐ） ---- */
+  function currentState() {
+    var rem = running ? endAt - performance.now() : remaining;
+    return { duration: duration, remaining: rem, running: running, over: over, a: a, b: b, mode: mode };
+  }
+  try {
+    var hot = window.claude && window.claude.hot;
+    if (hot && hot.snapshot) hot.snapshot(currentState);
+  } catch (e) {}
+
+  function start(data) {
+    loadPrefs();
+    if (data && typeof data.duration === 'number') {
+      duration = data.duration; remaining = data.remaining; over = !!data.over;
+      a = data.a || 0; b = data.b || 0; mode = data.mode === 'inner' ? 'inner' : 'point';
+      var m = document.querySelector('input[name="mode"][value="' + mode + '"]');
+      if (m) m.checked = true;
+    }
+    render(); renderScores(); ui();
+    if (data && data.running) begin();
+  }
+  var hotApi = window.claude && window.claude.hot;
+  if (hotApi && hotApi.ready) hotApi.ready(start);
+  else start(hotApi && hotApi.data ? hotApi.data : {});
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+
+</body>
+</html>
