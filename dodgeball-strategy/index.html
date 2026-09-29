@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ドッヂボール作戦ボード</title>
+<title>ドッヂボール作戦ボード 横型</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
@@ -49,6 +49,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg);
@@ -97,7 +98,7 @@ html.fs-lite #app { position: fixed; inset: 0; z-index: 30; background: var(--bg
   background: var(--fg); color: var(--bg); padding: .5em 1em; border-radius: 999px; font-size: 1em; font-weight: 500; white-space: nowrap;
 }
 #rotate {
-  display: none; position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 8;
+  display: none; position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 8; margin: 0;
   background: var(--fg); color: var(--bg); padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap;
 }
 @media (orientation: portrait) and (max-width: 700px) { #rotate { display: block; } }
@@ -170,38 +171,38 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
   <p id="rotate">横向きにすると大きく使えます</p>
   <div id="stage">
     <div id="left">
-    <div class="bar">
-      <button class="chip" id="bFs" type="button" aria-pressed="false" aria-label="全画面表示">
-        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全画面</button>
-      <button class="chip" id="bBack" type="button" aria-label="全画面表示を終了して戻る" disabled>
-        <svg viewBox="0 0 24 24"><path d="M9 6L3 12l6 6M3 12h11a6 6 0 0 1 6 6"/></svg>戻る</button>
-    </div>
-    <div id="courtwrap">
-      <svg id="court" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ドッヂボールコート（内野10m×10mが2面、外野は3m幅）">
-        <rect class="pass" x="0" y="0" width="1200" height="800"/>
-        <rect class="out" x="80" y="80" width="320" height="640"/>
-        <rect class="out" x="800" y="80" width="320" height="640"/>
-        <rect class="in" x="200" y="200" width="800" height="400"/>
-        <g fill="none" stroke="var(--line)" stroke-width="6" pointer-events="none">
-          <rect x="200" y="200" width="800" height="400"/>
-          <line x1="600" y1="200" x2="600" y2="600"/>
-          <circle cx="600" cy="400" r="40"/>
-        </g>
-        <g class="lbl">
-          <text x="400" y="236">自チーム 内野</text>
-          <text x="800" y="236">相手 内野</text>
-        </g>
-        <g class="lbl2">
-          <text transform="translate(44 400) rotate(-90)">相手 外野</text>
-          <text transform="translate(1156 400) rotate(90)">自チーム 外野</text>
-          <text x="600" y="766" style="font-size:20px">黄色は移動通路</text>
-        </g>
-        <g id="gPlayers"></g>
-        <g id="gStrokes" pointer-events="none"></g>
-        <g id="gLive" pointer-events="none"></g>
-      </svg>
-      <div id="toast" role="status" hidden></div>
-    </div>
+      <div class="bar">
+        <button class="chip" id="bFs" type="button" aria-pressed="false" aria-label="全画面表示">
+          <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全画面</button>
+        <button class="chip" id="bBack" type="button" aria-label="全画面表示を終了して戻る" disabled>
+          <svg viewBox="0 0 24 24"><path d="M9 6L3 12l6 6M3 12h11a6 6 0 0 1 6 6"/></svg>戻る</button>
+      </div>
+      <div id="courtwrap">
+        <svg id="court" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ドッヂボールコート（内野10m×10mが2面、外野は3m幅）">
+          <rect class="pass" x="0" y="0" width="1200" height="800"/>
+          <rect class="out" x="80" y="80" width="320" height="640"/>
+          <rect class="out" x="800" y="80" width="320" height="640"/>
+          <rect class="in" x="200" y="200" width="800" height="400"/>
+          <g fill="none" stroke="var(--line)" stroke-width="6" pointer-events="none">
+            <rect x="200" y="200" width="800" height="400"/>
+            <line x1="600" y1="200" x2="600" y2="600"/>
+            <circle cx="600" cy="400" r="40"/>
+          </g>
+          <g class="lbl">
+            <text x="400" y="236">自チーム 内野</text>
+            <text x="800" y="236">相手 内野</text>
+          </g>
+          <g class="lbl2">
+            <text transform="translate(44 400) rotate(-90)">相手 外野</text>
+            <text transform="translate(1156 400) rotate(90)">自チーム 外野</text>
+            <text x="600" y="766" style="font-size:20px">黄色は移動通路</text>
+          </g>
+          <g id="gPlayers"></g>
+          <g id="gStrokes" pointer-events="none"></g>
+          <g id="gLive" pointer-events="none"></g>
+        </svg>
+        <div id="toast" role="status" hidden></div>
+      </div>
     </div>
 
     <aside id="side">
@@ -599,7 +600,13 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
     b.players = b.players.filter(x => x.id !== selId);
     selId = null; refresh();
   });
-  $('#pclose').addEventListener('click', () => { selId = null; renderCourt(); renderEdit(); });
+  function closeEdit() {
+    selId = null;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    renderCourt(); renderEdit();
+  }
+  $('#pclose').addEventListener('click', closeEdit);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && selId && !lite) closeEdit(); });
 
   /* ---------- 全画面表示 / 戻る ---------- */
   const root = document.documentElement;
