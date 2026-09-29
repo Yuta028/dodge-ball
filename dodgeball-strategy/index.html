@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <style>
-/* Layout: 16:10の横長ステージ。左にコート(30m×20mの図どおり)、右に操作パネル。 */
+/* Layout: 16:9の横長ステージ。左上に全画面・戻るボタン、その下にコート(30m×20mの図どおり)、右に操作パネル。 */
 :root {
   --bg: #eef1f3;
   --fg: #17212b;
@@ -60,14 +60,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outlin
 
 #app { position: relative; height: 100%; padding-inline: 16px; padding-block: 8px; display: grid; place-items: center; container-type: size; }
 #stage {
-  width: min(100%, calc((100vh - 16px) * 1.6));
-  width: min(100cqw, 160cqh);
-  aspect-ratio: 16 / 10; overflow: hidden; container-type: inline-size;
-  display: grid; grid-template-columns: minmax(0, 74fr) minmax(0, 26fr); grid-template-rows: minmax(0, 1fr); gap: 1.4cqw;
+  width: min(100%, calc((100vh - 16px) * 1.7778));
+  width: min(100cqw, 177.78cqh);
+  aspect-ratio: 16 / 9; overflow: hidden; container-type: inline-size;
+  display: grid; grid-template-columns: minmax(0, 75fr) minmax(0, 25fr); grid-template-rows: minmax(0, 1fr); gap: 1.4cqw;
   font-size: 14px; font-size: max(11px, 1.1cqw);
 }
+html.is-fs #app { padding: 0; }
+html.fs-lite #app { position: fixed; inset: 0; z-index: 30; background: var(--bg); padding: 0; height: auto; }
+#left { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: .5em; }
+.bar { display: flex; gap: .5em; flex: none; }
+.bar .chip { display: inline-flex; align-items: center; gap: .4em; }
+.bar svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-#courtwrap { position: relative; min-width: 0; min-height: 0; display: grid; align-content: center; }
+#courtwrap { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; display: grid; align-content: center; }
 #court { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
 #court .in { fill: var(--c-in); }
 #court .out { fill: var(--c-out); }
@@ -163,6 +169,13 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
 <div id="app">
   <p id="rotate">横向きにすると大きく使えます</p>
   <div id="stage">
+    <div id="left">
+    <div class="bar">
+      <button class="chip" id="bFs" type="button" aria-pressed="false" aria-label="全画面表示">
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>全画面</button>
+      <button class="chip" id="bBack" type="button" aria-label="全画面表示を終了して戻る" disabled>
+        <svg viewBox="0 0 24 24"><path d="M9 6L3 12l6 6M3 12h11a6 6 0 0 1 6 6"/></svg>戻る</button>
+    </div>
     <div id="courtwrap">
       <svg id="court" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ドッヂボールコート（内野10m×10mが2面、外野は3m幅）">
         <rect class="pass" x="0" y="0" width="1200" height="800"/>
@@ -188,6 +201,7 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
         <g id="gLive" pointer-events="none"></g>
       </svg>
       <div id="toast" role="status" hidden></div>
+    </div>
     </div>
 
     <aside id="side">
@@ -587,6 +601,39 @@ html { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) en
   });
   $('#pclose').addEventListener('click', () => { selId = null; renderCourt(); renderEdit(); });
 
+  /* ---------- 全画面表示 / 戻る ---------- */
+  const root = document.documentElement;
+  let lite = false; // 全画面APIが使えない環境では、枠いっぱいに広げる表示で代用する
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+  function syncFs() {
+    const on = !!fsEl() || lite;
+    root.classList.toggle('is-fs', !!fsEl());
+    root.classList.toggle('fs-lite', lite);
+    $('#bFs').setAttribute('aria-pressed', String(on));
+    $('#bBack').disabled = !on;
+  }
+  async function enterFs() {
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (req && document.fullscreenEnabled !== false) {
+      try { await Promise.resolve(req.call(root)); syncFs(); return; } catch (e) {}
+    }
+    lite = true; syncFs();
+  }
+  async function exitFs() {
+    if (lite) { lite = false; }
+    if (fsEl()) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen;
+      try { await Promise.resolve(ex.call(document)); } catch (e) {}
+    }
+    syncFs();
+  }
+  $('#bFs').addEventListener('click', () => { if (fsEl() || lite) exitFs(); else enterFs(); });
+  $('#bBack').addEventListener('click', exitFs);
+  document.addEventListener('fullscreenchange', syncFs);
+  document.addEventListener('webkitfullscreenchange', syncFs);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && lite) exitFs(); });
+
+  syncFs();
   refresh();
 })();
 </script>
